@@ -10,8 +10,7 @@ async def send_to_telegram(message: str):
     url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
     payload = {
         "chat_id": TELEGRAM_CHAT_ID,
-        "text": message,
-        "parse_mode": "HTML"
+        "text": message[:4000]
     }
     async with aiohttp.ClientSession() as session:
         async with session.post(url, json=payload) as resp:
@@ -27,7 +26,7 @@ class NewsForwarder(discord.Client):
         if message.channel.name != DISCORD_CHANNEL_NAME:
             return
 
-        text = f"📰 <b>{message.author.display_name}</b>\n{message.content}"
+        text = f"{message.author.display_name}:\n{message.content}"
         await send_to_telegram(text)
 
 intents = discord.Intents.default()
