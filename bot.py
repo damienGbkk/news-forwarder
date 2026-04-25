@@ -12,21 +12,30 @@ async def send_to_telegram(message: str):
         "chat_id": TELEGRAM_CHAT_ID,
         "text": message[:4000]
     }
+    print(f"[TELEGRAM] Envoi vers {TELEGRAM_CHAT_ID}...")
     async with aiohttp.ClientSession() as session:
         async with session.post(url, json=payload) as resp:
-            return await resp.json()
+            result = await resp.json()
+            print(f"[TELEGRAM] Réponse : {result}")
+            return result
 
 class NewsForwarder(discord.Client):
     async def on_ready(self):
         print(f"Bot connecté : {self.user}")
 
     async def on_message(self, message):
+        print(f"[DISCORD] Message reçu de {message.author} dans #{message.channel.name}")
+        
         if message.author.bot:
+            print("[DISCORD] Ignoré : c'est un bot")
             return
+        
         if message.channel.name != DISCORD_CHANNEL_NAME:
+            print(f"[DISCORD] Ignoré : canal '{message.channel.name}' != '{DISCORD_CHANNEL_NAME}'")
             return
 
         text = f"{message.author.display_name}:\n{message.content}"
+        print(f"[DISCORD] Forward vers Telegram : {text[:100]}")
         await send_to_telegram(text)
 
 intents = discord.Intents.default()
