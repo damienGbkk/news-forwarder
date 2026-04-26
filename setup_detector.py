@@ -73,14 +73,11 @@ def get_daily_levels():
 def is_killzone():
     now = datetime.now(timezone.utc)
     h = now.hour
-    m = now.minute
     wd = now.weekday()
     if wd >= 5:
         return False
-    # London killzone 07h-09h UTC
     if 7 <= h < 9:
         return True
-    # NY killzone 12h-14h UTC
     if 12 <= h < 14:
         return True
     return False
@@ -107,29 +104,24 @@ def check_setup():
     c4 = candles[-1]
 
     current_price = c4["close"]
+    odh = levels["odh"]
+    odl = levels["odl"]
+    weekly_high = levels["weekly_high"]
+    weekly_low = levels["weekly_low"]
+
+    fvg_zone = None
 
     # SWEEP detection
-    sweep_dir = None
-    sweep_level = None
-
-    if c4["high"] > levels["odh"] and c4["close"] < levels["odh"]:
-        sweep_dir = "BEARISH"
-        sweep_level = levels["odh"]
+    if c4["high"] > odh and c4["close"] < odh:
         sweep_detected = "BEARISH"
         sweep_time = now
-    elif c4["low"] < levels["odl"] and c4["close"] > levels["odl"]:
-        sweep_dir = "BULLISH"
-        sweep_level = levels["odl"]
+    elif c4["low"] < odl and c4["close"] > odl:
         sweep_detected = "BULLISH"
         sweep_time = now
-    elif c4["high"] > levels["weekly_high"] and c4["close"] < levels["weekly_high"]:
-        sweep_dir = "BEARISH"
-        sweep_level = levels["weekly_high"]
+    elif c4["high"] > weekly_high and c4["close"] < weekly_high:
         sweep_detected = "BEARISH"
         sweep_time = now
-    elif c4["low"] < levels["weekly_low"] and c4["close"] > levels["weekly_low"]:
-        sweep_dir = "BULLISH"
-        sweep_level = levels["weekly_low"]
+    elif c4["low"] < weekly_low and c4["close"] > weekly_low:
         sweep_detected = "BULLISH"
         sweep_time = now
 
@@ -139,7 +131,6 @@ def check_setup():
             and round(c4["close"] - c4["open"], 2) > 1):
         cisd_detected = "BULLISH"
         cisd_time = now
-
     elif (c1["bullish"] and c2["bullish"] and c3["bullish"]
             and not c4["bullish"] and c4["low"] < c3["low"]
             and round(c4["open"] - c4["close"], 2) > 1):
@@ -155,10 +146,8 @@ def check_setup():
         fvg_detected = "BEARISH"
         fvg_time = now
         fvg_zone = f"{c3['high']} - {c1['low']}"
-    else:
-        fvg_zone = None
 
-    # CONFLUENCE check - les 3 dans la meme direction dans les 15 dernieres minutes
+    # CONFLUENCE check
     setup_key = f"{current_price}-{sweep_detected}-{cisd_detected}-{fvg_detected}"
 
     if (sweep_detected and cisd_detected and fvg_detected
@@ -171,14 +160,15 @@ def check_setup():
         action = "LONG" if direction == "BULLISH" else "SHORT"
 
         msg = (
-            f"SETUP COMPLET - {direction}\n"
+            f"SETUP DAMIEN - {direction}\n"
             f"========================\n"
             f"Sweep + CISD + FVG confirmes\n"
             f"Direction: {action}\n"
             f"Prix actuel: {current_price}\n"
             f"FVG zone: {fvg_zone}\n"
             f"------------------------\n"
-            f"ODH: {levels['odh']} | ODL: {levels['odl']}\n"
+            f"ODH: {odh} | ODL: {odl}\n"
+            f"Weekly High: {weekly_high} | Weekly Low: {weekly_low}\n"
             f"------------------------\n"
             f"Chercher entree sur retest FVG\n"
             f"SL sous le sweep | TP prochain niveau"
