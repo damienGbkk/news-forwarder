@@ -85,4 +85,4 @@ def get_verdict(tips, dxy, vix):
 def send_context(session_name):
     gold = get_price("GC=F")
     dxy = get_price("DX-Y.NYB")
-    vix =
+    vix = get_price("^VIX")
