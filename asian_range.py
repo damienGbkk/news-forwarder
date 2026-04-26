@@ -69,12 +69,16 @@ def send_asian_range():
         return
 
     current = data["current"]
+    h = data["high"]
+    l = data["low"]
+    rng = data["range"]
+
     if current:
-        if current > data["high"]:
+        if current > h:
             position = "Prix AU-DESSUS du range -> sweep du high possible"
-        elif current < data["low"]:
+        elif current < l:
             position = "Prix EN-DESSOUS du range -> sweep du low possible"
-        elif current > (data["high"] + data["low"]) / 2:
+        elif current > (h + l) / 2:
             position = "Prix dans le range -> upper half"
         else:
             position = "Prix dans le range -> lower half"
@@ -83,6 +87,27 @@ def send_asian_range():
 
     msg = (
         f"ASIAN RANGE - GOLD\n"
-        f"High: {data['high']}\n"
-        f"Low:  {data['low']}\n"
-        f"Range: {data['range'
+        f"High: {h}\n"
+        f"Low: {l}\n"
+        f"Range: {rng} pts\n"
+        f"Prix actuel: {current}\n"
+        f"{position}\n"
+        f"Niveaux London open:\n"
+        f"Resistance: {h}\n"
+        f"Support: {l}"
+    )
+    send_telegram(msg)
+    print("Asian range sent", flush=True)
+
+print("Asian range started", flush=True)
+
+while True:
+    now = datetime.now(timezone.utc)
+    if now.hour == 6 and now.minute == 30:
+        if not sent_asian_range:
+            send_asian_range()
+            sent_asian_range = True
+    else:
+        if not (now.hour == 6 and now.minute >= 30):
+            sent_asian_range = False
+    time.sleep(60)
