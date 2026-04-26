@@ -1,0 +1,118 @@
+import os
+import requests
+import time
+from datetime import datetime, timezone, timedelta
+import xml.etree.ElementTree as ET
+
+TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN")
+TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID")
+
+HIGH_IMPACT_KEYWORDS = [
+    "Non-Farm", "NFP", "CPI", "Core CPI", "FOMC", "Fed", "Powell",
+    "PPI", "GDP", "Retail Sales", "ISM", "ADP", "Jobless Claims",
+    "PCE", "Unemployment", "Interest Rate", "Monetary Policy",
+    "Press Conference", "Trump", "sanctions", "tariff"
+]
+
+alerted_1h = set()
+alerted_15m = set()
+alerted_result = set()
+
+def send_telegram(text):
+    url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
+    try:
+        requests.post(url, json={
+            "chat_id": TELEGRAM_CHAT_ID,
+            "text": text,
+            "parse_mode": "HTML"
+        }, timeout=10)
+    except Exception as e:
+        print(f"Telegram error: {e}", flush=True)
+
+def is_high_impact(title):
+    for keyword in HIGH_IMPACT_KEYWORDS:
+        if keyword.lower() in title.lower():
+            return True
+    return False
+
+def fetch_forex_factory():
+    url = "https://nfs.faireconomy.media/ff_calendar_thisweek.json"
+    try:
+        r = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=10)
+        return r.json()
+    except Exception as e:
+        print(f"ForexFactory fetch error: {e}", flush=True)
+        return []
+
+def check_events():
+    events = fetch_forex_factory()
+    now = datetime.now(timezone.utc)
+
+    for event in events:
+        if event.get("currency") != "USD":
+            continue
+        if event.get("impact") != "High":
+            continue
+
+        title = event.get("title", "")
+        date_str = event.get("date", "")
+        time_str = event.get("time", "")
+
+        if not time_str or time_str == "":
+            continue
+
+        try:
+            event_dt = datetime.strptime(f"{date_str} {time_str}", "%m-%d-%Y %I:%M%p")
+            event_dt = event_dt.replace(tzinfo=timezone.utc)
+        except:
+            continue
+
+        event_id = f"{title}_{date_str}_{time_str}"
+        diff = (event_dt - now).total_seconds() / 60
+
+        # Alerte 1h avant
+        if 55 <= diff <= 65 and event_id not in alerted_1h:
+            forecast = event.get("forecast", "N/A")
+            previous = event.get("previous", "N/A")
+            msg = (
+                f"⚠️ <b>1H WARNING — {title}</b>\n"
+                f"🕐 {time_str} UTC\n"
+                f"Forecast: {forecast} | Previous: {previous}\n"
+                f"🔴 High impact — consider closing positions"
+            )
+            send_telegram(msg)
+            alerted_1h.add(event_id)
+            print(f"1H alert sent: {title}", flush=True)
+
+        # Alerte 15min avant
+        if 10 <= diff <= 20 and event_id not in alerted_15m:
+            forecast = event.get("forecast", "N/A")
+            previous = event.get("previous", "N/A")
+            msg = (
+                f"🔴 <b>15MIN WARNING — {title}</b>\n"
+                f"🕐 {time_str} UTC\n"
+                f"Forecast: {forecast} | Previous: {previous}\n"
+                f"🚨 Stay out of the market"
+            )
+            send_telegram(msg)
+            alerted_15m.add(event_id)
+            print(f"15M alert sent: {title}", flush=True)
+
+        # Résultat après publication
+        actual = event.get("actual", "")
+        if actual and actual != "" and event_id not in alerted_result and diff < -2:
+            forecast = event.get("forecast", "N/A")
+            previous = event.get("previous", "N/A")
+            msg = (
+                f"✅ <b>RESULT — {title}</b>\n"
+                f"Actual: <b>{actual}</b>\n"
+                f"Forecast: {forecast} | Previous: {previous}"
+            )
+            send_telegram(msg)
+            alerted_result.add(event_id)
+            print(f"Result sent: {title}", flush=True)
+
+print("News filter started", flush=True)
+while True:
+    check_events()
+    time.sleep(900)  # toutes les 15 minutes
