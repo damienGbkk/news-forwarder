@@ -6,4 +6,5 @@ python killzones.py &
 python weekly_bias.py &
 python daily_bias.py &
 python correlation_alert.py &
-python setup_detector.py
+python setup_detector.py &
+python vwap_alert.py
