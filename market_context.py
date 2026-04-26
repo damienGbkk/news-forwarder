@@ -39,10 +39,11 @@ def get_tips():
     except:
         return None
 
-def get_verdict(tips, dxy, vix):
+def get_verdict(tips, dxy, vix, gsr):
     bull = 0
     bear = 0
     details = []
+
     if tips is not None:
         if tips < 0:
             bull += 2
@@ -53,6 +54,7 @@ def get_verdict(tips, dxy, vix):
         else:
             bear += 2
             details.append("🔴 Taux reels eleves -> defavorable Gold")
+
     if dxy is not None:
         if dxy < 99:
             bull += 2
@@ -63,31 +65,52 @@ def get_verdict(tips, dxy, vix):
         else:
             bull += 1
             details.append("🟡 DXY neutre")
+
     if vix is not None:
         if vix > 25:
             details.append("⚠️ VIX eleve -> volatilite forte, prudence")
         else:
             bull += 1
             details.append("🟢 VIX bas -> risk-on")
+
+    if gsr is not None:
+        if gsr < 80:
+            bull += 1
+            details.append("🟢 Gold/Silver ratio bas -> Silver surperforme -> risk-on confirme")
+        elif gsr > 90:
+            bear += 1
+            details.append("🔴 Gold/Silver ratio eleve -> Silver sous-performe -> risk-off")
+        else:
+            details.append("🟡 Gold/Silver ratio neutre")
+
     if bull > bear + 1:
         verdict = "🟢 GOLD BULLISH"
     elif bear > bull + 1:
         verdict = "🔴 GOLD BEARISH"
     else:
         verdict = "🟡 GOLD NEUTRE - pas de biais clair"
+
     return verdict, "\n".join(details)
 
 def send_context(session_name):
     gold = get_price("GC=F")
+    silver = get_price("SI=F")
     dxy = get_price("DX-Y.NYB")
     vix = get_price("^VIX")
     tips = get_tips()
-    verdict, details = get_verdict(tips, dxy, vix)
+
+    gsr = None
+    if gold and silver and silver > 0:
+        gsr = round(gold / silver, 2)
+
+    verdict, details = get_verdict(tips, dxy, vix, gsr)
+
     msg = (
         f"🌍 {session_name} OPEN - Market Context\n"
         f"━━━━━━━━━━━━━━━━\n"
-        f"GOLD: {gold} | DXY: {dxy} | VIX: {vix}\n"
-        f"TIPS 10Y: {tips}%\n"
+        f"GOLD: {gold} | SILVER: {silver}\n"
+        f"DXY: {dxy} | VIX: {vix}\n"
+        f"TIPS 10Y: {tips}% | Gold/Silver: {gsr}\n"
         f"━━━━━━━━━━━━━━━━\n"
         f"{details}\n"
         f"━━━━━━━━━━━━━━━━\n"
