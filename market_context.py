@@ -43,46 +43,80 @@ def get_verdict(tips, dxy, vix):
     bull = 0
     bear = 0
     details = []
-
     if tips is not None:
         if tips < 0:
             bull += 2
-            details.append("🟢 Taux réels négatifs → favorable Gold")
+            details.append("🟢 Taux reels negatifs -> favorable Gold")
         elif tips < 1.5:
             bull += 1
-            details.append("🟡 Taux réels bas → neutre/bullish Gold")
+            details.append("🟡 Taux reels bas -> neutre/bullish Gold")
         else:
             bear += 2
-            details.append("🔴 Taux réels élevés → défavorable Gold")
-
+            details.append("🔴 Taux reels eleves -> defavorable Gold")
     if dxy is not None:
         if dxy < 99:
             bull += 2
-            details.append("🟢 DXY faible → favorable Gold")
+            details.append("🟢 DXY faible -> favorable Gold")
         elif dxy > 101:
             bear += 2
-            details.append("🔴 DXY fort → défavorable Gold")
+            details.append("🔴 DXY fort -> defavorable Gold")
         else:
             bull += 1
             details.append("🟡 DXY neutre")
-
     if vix is not None:
         if vix > 25:
-            details.append("⚠️ VIX élevé → volatilité forte, prudence")
+            details.append("⚠️ VIX eleve -> volatilite forte, prudence")
         else:
             bull += 1
-            details.append("🟢 VIX bas → risk-on")
-
+            details.append("🟢 VIX bas -> risk-on")
     if bull > bear + 1:
-        verdict = "🟢 <b>GOLD BULLISH</b>"
+        verdict = "🟢 GOLD BULLISH"
     elif bear > bull + 1:
-        verdict = "🔴 <b>GOLD BEARISH</b>"
+        verdict = "🔴 GOLD BEARISH"
     else:
-        verdict = "🟡 <b>GOLD NEUTRE</b> — pas de biais clair"
-
+        verdict = "🟡 GOLD NEUTRE - pas de biais clair"
     return verdict, "\n".join(details)
 
 def send_context(session_name):
     gold = get_price("GC=F")
     dxy = get_price("DX-Y.NYB")
     vix = get_price("^VIX")
+    tips = get_tips()
+    verdict, details = get_verdict(tips, dxy, vix)
+    msg = (
+        f"🌍 {session_name} OPEN - Market Context\n"
+        f"━━━━━━━━━━━━━━━━\n"
+        f"GOLD: {gold} | DXY: {dxy} | VIX: {vix}\n"
+        f"TIPS 10Y: {tips}%\n"
+        f"━━━━━━━━━━━━━━━━\n"
+        f"{details}\n"
+        f"━━━━━━━━━━━━━━━━\n"
+        f"{verdict}"
+    )
+    send_telegram(msg)
+    print(f"{session_name} context sent", flush=True)
+
+print("Market context started", flush=True)
+
+while True:
+    now = datetime.now(timezone.utc)
+    hour = now.hour
+    minute = now.minute
+
+    if hour == 7 and minute == 0:
+        if not sent_london:
+            send_context("LONDON")
+            sent_london = True
+    else:
+        if hour != 7:
+            sent_london = False
+
+    if hour == 12 and minute == 0:
+        if not sent_ny:
+            send_context("NEW YORK")
+            sent_ny = True
+    else:
+        if hour != 12:
+            sent_ny = False
+
+    time.sleep(30)
