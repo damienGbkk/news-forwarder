@@ -35,75 +35,54 @@ def get_tips():
     try:
         r = requests.get(url, timeout=10)
         data = r.json()
-        value = float(data["observations"][0]["value"])
-        return round(value, 2)
+        return round(float(data["observations"][0]["value"]), 2)
     except:
         return None
 
-def get_bias(tips, dxy, vix):
-    bias = []
+def get_verdict(tips, dxy, vix):
+    bull = 0
+    bear = 0
+    details = []
+
     if tips is not None:
         if tips < 0:
-            bias.append("🟢 Real rate negative → Gold bullish")
+            bull += 2
+            details.append("🟢 Taux réels négatifs → favorable Gold")
         elif tips < 1.5:
-            bias.append("🟡 Real rate low → Gold neutral/bullish")
+            bull += 1
+            details.append("🟡 Taux réels bas → neutre/bullish Gold")
         else:
-            bias.append("🔴 Real rate high → Gold bearish")
+            bear += 2
+            details.append("🔴 Taux réels élevés → défavorable Gold")
+
     if dxy is not None:
         if dxy < 99:
-            bias.append("🟢 DXY weak → Gold bullish")
+            bull += 2
+            details.append("🟢 DXY faible → favorable Gold")
         elif dxy > 101:
-            bias.append("🔴 DXY strong → Gold bearish")
+            bear += 2
+            details.append("🔴 DXY fort → défavorable Gold")
         else:
-            bias.append("🟡 DXY neutral")
+            bull += 1
+            details.append("🟡 DXY neutre")
+
     if vix is not None:
         if vix > 25:
-            bias.append("⚠️ VIX elevated → Risk-off, Gold volatile")
+            details.append("⚠️ VIX élevé → volatilité forte, prudence")
         else:
-            bias.append("🟢 VIX low → Risk-on")
-    return "\n".join(bias)
+            bull += 1
+            details.append("🟢 VIX bas → risk-on")
+
+    if bull > bear + 1:
+        verdict = "🟢 <b>GOLD BULLISH</b>"
+    elif bear > bull + 1:
+        verdict = "🔴 <b>GOLD BEARISH</b>"
+    else:
+        verdict = "🟡 <b>GOLD NEUTRE</b> — pas de biais clair"
+
+    return verdict, "\n".join(details)
 
 def send_context(session_name):
     gold = get_price("GC=F")
     dxy = get_price("DX-Y.NYB")
-    vix = get_price("^VIX")
-    tips = get_tips()
-    bias = get_bias(tips, dxy, vix)
-
-    msg = (
-        f"🌍 <b>{session_name} OPEN — Market Context</b>\n"
-        f"━━━━━━━━━━━━━━━━\n"
-        f"GOLD: <b>{gold}</b>\n"
-        f"DXY: <b>{dxy}</b>\n"
-        f"VIX: <b>{vix}</b>\n"
-        f"TIPS 10Y (real rate): <b>{tips}%</b>\n"
-        f"━━━━━━━━━━━━━━━━\n"
-        f"{bias}"
-    )
-    send_telegram(msg)
-    print(f"{session_name} context sent", flush=True)
-
-print("Market context started", flush=True)
-
-while True:
-    now = datetime.now(timezone.utc)
-    hour = now.hour
-    minute = now.minute
-
-    if hour == 7 and minute == 0:
-        if not sent_london:
-            send_context("LONDON")
-            sent_london = True
-    else:
-        if hour != 7:
-            sent_london = False
-
-    if hour == 12 and minute == 0:
-        if not sent_ny:
-            send_context("NEW YORK")
-            sent_ny = True
-    else:
-        if hour != 12:
-            sent_ny = False
-
-    time.sleep(30)
+    vix =
