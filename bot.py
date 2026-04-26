@@ -39,23 +39,24 @@ async def on_ready():
 
 @client.event
 async def on_message(message):
-    if message.author.bot and message.author.id != client.user.id:
-        content = message.content
-        if message.embeds:
-            for embed in message.embeds:
-                parts = []
-                if embed.title:
-                    parts.append(f"<b>{embed.title}</b>")
-                if embed.description:
-                    parts.append(embed.description)
-                for field in embed.fields:
-                    parts.append(f"{field.name}: {field.value}")
-                if embed.footer:
-                    parts.append(f"<i>{embed.footer.text}</i>")
-                content = "\n".join(parts)
-        if content:
-            print(f"Message reçu: {content[:100]}", flush=True)
-            send_telegram(content)
+    if message.author.id == client.user.id:
+        return
+    content = message.content
+    if message.embeds:
+        for embed in message.embeds:
+            parts = []
+            if embed.title:
+                parts.append(f"<b>{embed.title}</b>")
+            if embed.description:
+                parts.append(embed.description)
+            for field in embed.fields:
+                parts.append(f"{field.name}: {field.value}")
+            if embed.footer:
+                parts.append(f"<i>{embed.footer.text}</i>")
+            content = "\n".join(parts)
+    if content:
+        print(f"Message reçu: {content[:100]}", flush=True)
+        send_telegram(content)
 
 print("STEP 5 - Lancement du bot", flush=True)
 client.run(DISCORD_TOKEN)
