@@ -1,9 +1,8 @@
 import sys
-print("STEP 1 - Python fonctionne", flush=True)
-
 import os
 import requests
 
+print("STEP 1 - Python fonctionne", flush=True)
 print("STEP 2 - os et requests importés", flush=True)
 
 try:
@@ -41,7 +40,6 @@ async def on_ready():
 @client.event
 async def on_message(message):
     if message.author.bot and message.author.id != client.user.id:
-        # Forward uniquement les messages de bots (RTC News Bot)
         content = message.content
         if message.embeds:
             for embed in message.embeds:
