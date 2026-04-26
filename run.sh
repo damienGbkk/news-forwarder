@@ -6,6 +6,4 @@ python killzones.py &
 python weekly_bias.py &
 python daily_bias.py &
 python correlation_alert.py &
-python liquidity_sweep.py &
-python fvg_alert.py &
-python cisd_alert.py
+python setup_detector.py
