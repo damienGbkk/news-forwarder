@@ -1,8 +1,7 @@
 import os
 import requests
 import time
-from datetime import datetime, timezone, timedelta
-import xml.etree.ElementTree as ET
+from datetime import datetime, timezone
 
 TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN")
 TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID")
@@ -44,6 +43,64 @@ def fetch_forex_factory():
         print(f"ForexFactory fetch error: {e}", flush=True)
         return []
 
+def interpret_result(title, actual, forecast, previous):
+    try:
+        actual_f = float(actual.replace("%", "").replace("K", "").replace("M", "").replace("B", "").strip())
+        forecast_f = float(forecast.replace("%", "").replace("K", "").replace("M", "").replace("B", "").strip())
+    except:
+        return "🟡 <b>Impact neutre</b> — données insuffisantes pour interpréter"
+
+    title_lower = title.lower()
+    diff = actual_f - forecast_f
+
+    # CPI / PPI / PCE / inflation → haut = bearish Gold
+    if any(k in title_lower for k in ["cpi", "ppi", "pce", "inflation"]):
+        if diff > 0:
+            return "🔴 <b>GOLD BEARISH</b>\nInflation au-dessus du forecast → Dollar fort → pression sur Gold"
+        elif diff < 0:
+            return "🟢 <b>GOLD BULLISH</b>\nInflation sous le forecast → Dollar faible → Gold favorisé"
+        else:
+            return "🟡 <b>Impact neutre</b>\nInflation conforme au forecast"
+
+    # NFP / ADP / Employment → fort = bearish Gold
+    elif any(k in title_lower for k in ["non-farm", "nfp", "adp", "employment", "jobless", "unemployment"]):
+        if diff > 0:
+            return "🔴 <b>GOLD BEARISH</b>\nEmploi au-dessus du forecast → Fed hawkish → Gold sous pression"
+        elif diff < 0:
+            return "🟢 <b>GOLD BULLISH</b>\nEmploi sous le forecast → Fed dovish → Gold favorisé"
+        else:
+            return "🟡 <b>Impact neutre</b>\nEmploi conforme au forecast"
+
+    # GDP → fort = bearish Gold
+    elif "gdp" in title_lower:
+        if diff > 0:
+            return "🔴 <b>GOLD BEARISH</b>\nCroissance forte → Dollar fort → pression sur Gold"
+        elif diff < 0:
+            return "🟢 <b>GOLD BULLISH</b>\nCroissance faible → risque récession → Gold favorisé"
+        else:
+            return "🟡 <b>Impact neutre</b>\nGDP conforme au forecast"
+
+    # ISM / Retail Sales → fort = bearish Gold
+    elif any(k in title_lower for k in ["ism", "retail"]):
+        if diff > 0:
+            return "🔴 <b>GOLD BEARISH</b>\nDonnées économiques fortes → Dollar fort"
+        elif diff < 0:
+            return "🟢 <b>GOLD BULLISH</b>\nDonnées économiques faibles → Dollar sous pression"
+        else:
+            return "🟡 <b>Impact neutre</b>"
+
+    # FOMC / Interest Rate
+    elif any(k in title_lower for k in ["fomc", "interest rate", "fed"]):
+        return "⚠️ <b>FOMC/FED</b> — Attendre la conférence de presse avant de trader"
+
+    else:
+        if diff > 0:
+            return "🔴 <b>Données au-dessus du forecast</b> → tendance Dollar haussière → surveiller Gold"
+        elif diff < 0:
+            return "🟢 <b>Données sous le forecast</b> → tendance Dollar baissière → surveiller Gold"
+        else:
+            return "🟡 <b>Impact neutre</b> — conforme au forecast"
+
 def check_events():
     events = fetch_forex_factory()
     now = datetime.now(timezone.utc)
@@ -70,15 +127,16 @@ def check_events():
         event_id = f"{title}_{date_str}_{time_str}"
         diff = (event_dt - now).total_seconds() / 60
 
+        forecast = event.get("forecast", "N/A")
+        previous = event.get("previous", "N/A")
+
         # Alerte 1h avant
         if 55 <= diff <= 65 and event_id not in alerted_1h:
-            forecast = event.get("forecast", "N/A")
-            previous = event.get("previous", "N/A")
             msg = (
                 f"⚠️ <b>1H WARNING — {title}</b>\n"
                 f"🕐 {time_str} UTC\n"
                 f"Forecast: {forecast} | Previous: {previous}\n"
-                f"🔴 High impact — consider closing positions"
+                f"🔴 High impact — envisager de fermer les positions"
             )
             send_telegram(msg)
             alerted_1h.add(event_id)
@@ -86,27 +144,25 @@ def check_events():
 
         # Alerte 15min avant
         if 10 <= diff <= 20 and event_id not in alerted_15m:
-            forecast = event.get("forecast", "N/A")
-            previous = event.get("previous", "N/A")
             msg = (
                 f"🔴 <b>15MIN WARNING — {title}</b>\n"
                 f"🕐 {time_str} UTC\n"
                 f"Forecast: {forecast} | Previous: {previous}\n"
-                f"🚨 Stay out of the market"
+                f"🚨 Ne pas être en position"
             )
             send_telegram(msg)
             alerted_15m.add(event_id)
             print(f"15M alert sent: {title}", flush=True)
 
-        # Résultat après publication
+        # Résultat + interprétation
         actual = event.get("actual", "")
         if actual and actual != "" and event_id not in alerted_result and diff < -2:
-            forecast = event.get("forecast", "N/A")
-            previous = event.get("previous", "N/A")
+            interpretation = interpret_result(title, actual, forecast, previous)
             msg = (
                 f"✅ <b>RESULT — {title}</b>\n"
-                f"Actual: <b>{actual}</b>\n"
-                f"Forecast: {forecast} | Previous: {previous}"
+                f"Actual: <b>{actual}</b> | Forecast: {forecast} | Previous: {previous}\n"
+                f"━━━━━━━━━━━━━━━━\n"
+                f"{interpretation}"
             )
             send_telegram(msg)
             alerted_result.add(event_id)
@@ -115,4 +171,4 @@ def check_events():
 print("News filter started", flush=True)
 while True:
     check_events()
-    time.sleep(900)  # toutes les 15 minutes
+    time.sleep(900)
