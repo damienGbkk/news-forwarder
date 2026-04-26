@@ -20,8 +20,6 @@ def send_telegram(text):
         print(f"Telegram error: {e}", flush=True)
 
 def get_asian_range():
-    # Session asiatique = 13h00-06h00 UTC (20h-23h Bangkok = 13h-16h UTC)
-    # On fetch les bougies 1H sur GC=F
     url = "https://query1.finance.yahoo.com/v8/finance/chart/GC=F?interval=1h&range=2d"
     try:
         r = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=10)
@@ -31,7 +29,6 @@ def get_asian_range():
         lows = data["chart"]["result"][0]["indicators"]["quote"][0]["low"]
         closes = data["chart"]["result"][0]["indicators"]["quote"][0]["close"]
 
-        # Session asiatique = 23h00 UTC veille à 06h00 UTC aujourd'hui
         now = datetime.now(timezone.utc)
         asian_start = now.replace(hour=23, minute=0, second=0, microsecond=0) - timedelta(days=1)
         asian_end = now.replace(hour=6, minute=0, second=0, microsecond=0)
@@ -72,45 +69,20 @@ def send_asian_range():
         return
 
     current = data["current"]
-    position = ""
     if current:
         if current > data["high"]:
-            position = "⚡ Prix AU-DESSUS du range asiatique -> sweep du high possible"
+            position = "Prix AU-DESSUS du range -> sweep du high possible"
         elif current < data["low"]:
-            position = "⚡ Prix EN-DESSOUS du range asiatique -> sweep du low possible"
+            position = "Prix EN-DESSOUS du range -> sweep du low possible"
         elif current > (data["high"] + data["low"]) / 2:
-            position = "🟡 Prix dans le range -> upper half"
+            position = "Prix dans le range -> upper half"
         else:
-            position = "🟡 Prix dans le range -> lower half"
+            position = "Prix dans le range -> lower half"
+    else:
+        position = "Prix indisponible"
 
     msg = (
-        f"🌏 ASIAN RANGE - GOLD\n"
-        f"━━━━━━━━━━━━━━━━\n"
+        f"ASIAN RANGE - GOLD\n"
         f"High: {data['high']}\n"
         f"Low:  {data['low']}\n"
-        f"Range: {data['range']} pts\n"
-        f"Prix actuel: {current}\n"
-        f"━━━━━━━━━━━━━━━━\n"
-        f"{position}\n"
-        f"━━━━━━━━━━━━━━━━\n"
-        f"Niveaux a surveiller pour London open:\n"
-        f"🔴 Resistance: {data['high']}\n"
-        f"🟢 Support:    {data['low']}"
-    )
-    send_telegram(msg)
-    print("Asian range sent", flush=True)
-
-print("Asian range started", flush=True)
-
-while True:
-    now = datetime.now(timezone.utc)
-    # Envoi a 06h30 UTC = 13h30 Bangkok, 30 min avant London open
-    if now.hour == 6 and now.minute == 30:
-        if not sent_asian_range:
-            send_asian_range()
-            sent_asian_range = True
-    else:
-        if not (now.hour == 6 and now.minute >= 30):
-            sent_asian_range = False
-
-    time.sleep(60)
+        f"Range: {data['range'
